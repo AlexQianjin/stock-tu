@@ -1,5 +1,6 @@
 import os
 from dotenv import load_dotenv
+import pandas as pd
 import tushare as ts
 
 import pymongo_db_helper as db
@@ -22,15 +23,34 @@ def calc_data(df1, df2):
             i += 1
             print(dfs_filtered)
 
+def merge_data(df1, df2):
+    # result = pd.concat([df1, df2], axis=1, join="inner")
+    result = pd.merge(
+                df1,
+                df2,
+                how="inner",
+                on='ts_code',
+                suffixes=("_x", "_y"),
+                copy=True,
+                indicator=False,
+                validate=None,
+            )
+    df_filtered = result.query('close_y > close_x & close_y < 20 & close_y > 10 & vol_y > vol_x')
+    print(df_filtered)
+
 def get_data_today():
     pro = ts.pro_api(TU_API_KEY)
+
     df1 = pro.daily(trade_date='20230308')
-    df1 = df1[(str(df1['ts_code']).endswith('.SZ') | str(df1['ts_code']).endswith('.SH'))]
+    df1 = df1.where(lambda s: s['ts_code'].str.endswith('.SH') | s['ts_code'].str.endswith('.SZ')).dropna()
+    # print(df1)
     df1_red = df1.query('close > open & close > pre_close')
+
     df2 = pro.daily(trade_date='20230309')
-    df2 = df2[(str(df2['ts_code']).endswith('.SZ') | str(df2['ts_code']).endswith('.SH'))]
+    df2 = df2.where(lambda s: s['ts_code'].str.endswith('.SH') | s['ts_code'].str.endswith('.SZ')).dropna()
     df2_red = df2.query('close > open & close > pre_close')
-    calc_data(df1_red, df2_red)
+    # calc_data(df1_red, df2_red)
+    merge_data(df1_red, df2_red)
 
 if __name__ == '__main__':
     try:
